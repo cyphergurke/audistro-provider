@@ -1,0 +1,39 @@
+# Replace provider.example with your real hostname.
+provider.example {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+	}
+
+	# Do not expose internal/admin endpoints publicly.
+	handle /internal/* {
+		respond "forbidden" 403
+	}
+
+	# Do not expose metrics publicly by default.
+	handle /metrics {
+		respond "not found" 404
+	}
+
+	# Assets: keep byte-range friendly behavior by avoiding response encoding.
+	handle /assets/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Health/readiness endpoints.
+	handle /healthz {
+		encode zstd gzip
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle /readyz {
+		encode zstd gzip
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Default: do not expose anything else.
+	handle {
+		respond "not found" 404
+	}
+}

@@ -1,0 +1,23 @@
+[Unit]
+Description=audistro-provider service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=audistro-provider
+Group=audistro-provider
+WorkingDirectory=/var/lib/audistro-provider
+EnvironmentFile=/etc/audistro-provider/audistro-provider.env
+ExecStart=/usr/local/bin/audistro-provider
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/audistro-provider
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

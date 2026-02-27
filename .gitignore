@@ -1,0 +1,53 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build output
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Vendor directory (if using go modules)
+vendor/
+bin/
+dist/
+
+# Dependency directories
+/pkg/
+
+# Build artifacts
+/audistro-provider
+/audiprovider
+
+# Local runtime state
+data/provider.db
+data/provider_identity.json
+
+# IDE/editor files
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store
+
+# environment files
+.env
+
+# logs
+*.log
+
+# Kubernetes config or credentials
+.kube/
+
+# Coverage reports
+coverage.out
+
+# temp files
+tmp/
+
+# node modules if any
+node_modules/

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audistro-provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: audistro-provider
+  template:
+    metadata:
+      labels:
+        app: audistro-provider
+    spec:
+      containers:
+      - name: audistro-provider
+        image: ghcr.io/example/audistro-provider:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PROVIDER_DATA_PATH
+          value: /var/lib/audistro-provider
+        volumeMounts:
+        - name: audistro-provider-data
+          mountPath: /var/lib/audistro-provider
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 20
+      volumes:
+      - name: audistro-provider-data
+        persistentVolumeClaim:
+          claimName: audistro-provider-data

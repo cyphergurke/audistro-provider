@@ -1,0 +1,17 @@
+services:
+  audistro-provider:
+    container_name: audistro-provider
+    image: audistro-provider:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      PROVIDER_DATA_PATH: /var/lib/audistro-provider
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/var/lib/audistro-provider
+    restart: unless-stopped
+    stop_grace_period: 20s
