@@ -1,0 +1,336 @@
+openapi: 3.0.3
+info:
+  title: audistro-provider API
+  version: 1.0.0
+  description: |
+    HTTP API for health, metrics, asset serving, and internal maintenance actions.
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service health information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      summary: Readiness check
+      operationId: getReadiness
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Metrics exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+  /openapi.yaml:
+    get:
+      summary: OpenAPI specification
+      operationId: getOpenAPISpec
+      responses:
+        "200":
+          description: OpenAPI spec in YAML format
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /docs:
+    get:
+      summary: Scalar API docs UI
+      operationId: getDocs
+      responses:
+        "200":
+          description: HTML docs UI
+          content:
+            text/html:
+              schema:
+                type: string
+  /assets/{assetId}/master.m3u8:
+    get:
+      summary: Get asset master playlist
+      operationId: getAssetMasterPlaylist
+      parameters:
+        - $ref: "#/components/parameters/assetId"
+      responses:
+        "200":
+          description: Playlist file
+          content:
+            application/vnd.apple.mpegurl:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    head:
+      summary: Check asset master playlist headers
+      operationId: headAssetMasterPlaylist
+      parameters:
+        - $ref: "#/components/parameters/assetId"
+      responses:
+        "200":
+          description: Playlist exists
+  /assets/{assetId}/{filename}:
+    get:
+      summary: Get asset segment/file
+      operationId: getAssetFile
+      parameters:
+        - $ref: "#/components/parameters/assetId"
+        - $ref: "#/components/parameters/filename"
+      responses:
+        "200":
+          description: Asset file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Segment too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    head:
+      summary: Check asset segment/file headers
+      operationId: headAssetFile
+      parameters:
+        - $ref: "#/components/parameters/assetId"
+        - $ref: "#/components/parameters/filename"
+      responses:
+        "200":
+          description: File exists
+  /internal/rescan:
+    post:
+      summary: Trigger a rescan
+      description: |
+        Mounted only when PROVIDER_INTERNAL_ENABLE=true and usually restricted to allowlisted CIDRs.
+      operationId: postInternalRescan
+      responses:
+        "200":
+          description: Rescan completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescanResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Rescan failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /internal/announce:
+    post:
+      summary: Trigger announcement(s)
+      description: |
+        Mounted only when PROVIDER_INTERNAL_ENABLE=true and usually restricted to allowlisted CIDRs.
+      operationId: postInternalAnnounce
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnnounceRequest"
+      responses:
+        "200":
+          description: Announcement attempt summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnounceSummary"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Catalog client unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  parameters:
+    assetId:
+      name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    filename:
+      name: filename
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+    ReadinessResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+        reason:
+          type: string
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - service
+        - version
+        - time
+        - provider_id
+        - public_key
+        - catalog_enabled
+        - metrics_enabled
+        - jobs_enabled
+        - deferred_announces_count
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        version:
+          type: string
+        time:
+          type: string
+          format: date-time
+        region:
+          type: string
+        public_base_url:
+          type: string
+        provider_id:
+          type: string
+        public_key:
+          type: string
+        active_assets_count:
+          type: integer
+        warning:
+          type: string
+        catalog_enabled:
+          type: boolean
+        catalog_last_error:
+          type: string
+        metrics_enabled:
+          type: boolean
+        jobs_enabled:
+          type: boolean
+        last_rescan_at:
+          type: integer
+          format: int64
+        last_announce_sweep_at:
+          type: integer
+          format: int64
+        deferred_announces_count:
+          type: integer
+    RescanResponse:
+      type: object
+      required:
+        - scanned_assets
+        - active_assets
+        - missing_assets
+        - duration_ms
+      properties:
+        scanned_assets:
+          type: integer
+        active_assets:
+          type: integer
+        missing_assets:
+          type: integer
+        duration_ms:
+          type: integer
+          format: int64
+    AnnounceRequest:
+      type: object
+      properties:
+        asset_id:
+          type: string
+    AnnounceSummary:
+      type: object
+      required:
+        - attempted
+        - ok
+        - rejected
+        - failed
+      properties:
+        attempted:
+          type: integer
+        ok:
+          type: integer
+        rejected:
+          type: integer
+        failed:
+          type: integer
