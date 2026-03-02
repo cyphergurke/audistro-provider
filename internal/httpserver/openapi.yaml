@@ -57,6 +57,17 @@ paths:
             application/yaml:
               schema:
                 type: string
+  /openapi.json:
+    get:
+      summary: OpenAPI specification as JSON
+      operationId: getOpenAPISpecJSON
+      responses:
+        "200":
+          description: OpenAPI spec in JSON format
+          content:
+            application/json:
+              schema:
+                type: object
   /docs:
     get:
       summary: Scalar API docs UI
@@ -235,6 +246,8 @@ components:
         - error
       properties:
         error:
+          type: string
+        message:
           type: string
     ReadinessResponse:
       type: object

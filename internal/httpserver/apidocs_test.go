@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -36,6 +37,23 @@ func TestOpenAPISpecEndpoint(t *testing.T) {
 	if !strings.Contains(body, "/internal/announce:") {
 		t.Fatalf("expected internal announce path in response")
 	}
+
+	jsonReq := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	jsonRR := httptest.NewRecorder()
+	srv.HTTP.Handler.ServeHTTP(jsonRR, jsonReq)
+	if jsonRR.Code != http.StatusOK {
+		t.Fatalf("expected json spec status 200, got %d", jsonRR.Code)
+	}
+	if ct := jsonRR.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+		t.Fatalf("unexpected json content type: %q", ct)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(jsonRR.Body.Bytes(), &doc); err != nil {
+		t.Fatalf("decode json spec: %v", err)
+	}
+	if doc["openapi"] != "3.0.3" {
+		t.Fatalf("unexpected openapi version: %#v", doc["openapi"])
+	}
 }
 
 func TestScalarDocsEndpoint(t *testing.T) {
@@ -55,7 +73,7 @@ func TestScalarDocsEndpoint(t *testing.T) {
 	if !strings.Contains(body, "@scalar/api-reference") {
 		t.Fatalf("expected scalar script include in docs html")
 	}
-	if !strings.Contains(body, "data-url=\"/openapi.yaml\"") {
+	if !strings.Contains(body, "data-url=\"/openapi.json\"") {
 		t.Fatalf("expected openapi spec URL in docs html")
 	}
 }

@@ -16,7 +16,7 @@ func TestOpenAPISpecCoversRegisteredEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read registered endpoints: %v", err)
 	}
-	specOps, err := parseOpenAPIOperations(string(openAPISpec))
+	specOps, err := parseOpenAPIOperations(string(openAPIYAML))
 	if err != nil {
 		t.Fatalf("parse openapi operations: %v", err)
 	}

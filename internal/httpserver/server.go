@@ -51,9 +51,10 @@ func NewWithDeps(
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{}))
-	mux.Handle("GET /docs", scalarDocsHandler(openAPISpecPath))
-	mux.Handle("GET /docs/", scalarDocsHandler(openAPISpecPath))
-	mux.Handle("GET /openapi.yaml", openAPISpecHandler())
+	mux.Handle("GET /docs", scalarDocsHandler(openAPIJSONPath))
+	mux.Handle("GET /docs/", scalarDocsHandler(openAPIJSONPath))
+	mux.Handle("GET /openapi.yaml", openAPISpecYAMLHandler())
+	mux.Handle("GET /openapi.json", openAPISpecJSONHandler())
 
 	mux.Handle("GET /healthz", health.Handler(
 		"audistro-provider",
@@ -107,6 +108,7 @@ func NewWithDeps(
 		HTTPMetrics(metricsCollector),
 		AccessLog(logger),
 		Recover(logger),
+		OpenAPIValidation,
 		RequestID,
 	)
 

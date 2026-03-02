@@ -2,26 +2,76 @@ package httpserver
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
-const openAPISpecPath = "/openapi.yaml"
+const (
+	openAPIYAMLPath = "/openapi.yaml"
+	openAPIJSONPath = "/openapi.json"
+)
 
-//go:embed openapi.yaml
-var openAPISpec []byte
+var (
+	//go:embed openapi.yaml
+	openAPIYAML []byte
 
-func openAPISpecHandler() http.Handler {
+	loadOpenAPISpecOnce sync.Once
+	loadedOpenAPISpec   *openapi3.T
+	loadedOpenAPIJSON   []byte
+	loadOpenAPISpecErr  error
+)
+
+func loadOpenAPISpec() (*openapi3.T, error) {
+	loadOpenAPISpecOnce.Do(func() {
+		loader := openapi3.NewLoader()
+		spec, err := loader.LoadFromData(openAPIYAML)
+		if err != nil {
+			loadOpenAPISpecErr = err
+			return
+		}
+		if err := spec.Validate(loader.Context); err != nil {
+			loadOpenAPISpecErr = err
+			return
+		}
+		jsonSpec, err := json.MarshalIndent(spec, "", "  ")
+		if err != nil {
+			loadOpenAPISpecErr = err
+			return
+		}
+		loadedOpenAPISpec = spec
+		loadedOpenAPIJSON = jsonSpec
+	})
+	return loadedOpenAPISpec, loadOpenAPISpecErr
+}
+
+func openAPISpecYAMLHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(openAPISpec)
+		_, _ = w.Write(openAPIYAML)
+	})
+}
+
+func openAPISpecJSONHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := loadOpenAPISpec()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("load openapi spec: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(loadedOpenAPIJSON)
 	})
 }
 
 func scalarDocsHandler(specPath string) http.Handler {
 	if specPath == "" {
-		specPath = openAPISpecPath
+		specPath = openAPIJSONPath
 	}
 	html := fmt.Sprintf(`<!doctype html>
 <html lang="en">
