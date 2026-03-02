@@ -22,4 +22,5 @@ VOLUME ["/var/lib/audistro-provider"]
 EXPOSE 8080
 
 COPY --from=build /out/audistro-provider /usr/local/bin/audistro-provider
+COPY ops /app/ops
 CMD ["/usr/local/bin/audistro-provider"]

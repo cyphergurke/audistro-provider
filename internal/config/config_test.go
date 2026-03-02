@@ -87,6 +87,7 @@ func TestValidateHMACSecretTooShort(t *testing.T) {
 }
 
 func TestLoadDefaultsInternalAPIToDisabledInProd(t *testing.T) {
+	t.Setenv("AUDISTRO_ENV", "")
 	t.Setenv("PROVIDER_ENV", "prod")
 	t.Setenv("PROVIDER_INTERNAL_ENABLE", "")
 	t.Setenv("PROVIDER_INTERNAL_ALLOWED_CIDRS", "")
@@ -94,6 +95,16 @@ func TestLoadDefaultsInternalAPIToDisabledInProd(t *testing.T) {
 	cfg := Load()
 	if cfg.InternalEnable {
 		t.Fatalf("expected internal api disabled by default in prod")
+	}
+}
+
+func TestLoadPrefersAudistroEnv(t *testing.T) {
+	t.Setenv("AUDISTRO_ENV", "dev")
+	t.Setenv("PROVIDER_ENV", "prod")
+
+	cfg := Load()
+	if cfg.Env != "dev" {
+		t.Fatalf("expected AUDISTRO_ENV to win, got %q", cfg.Env)
 	}
 }
 

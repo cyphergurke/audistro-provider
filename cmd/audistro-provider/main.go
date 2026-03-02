@@ -18,6 +18,7 @@ import (
 	"audistro-provider/internal/catalog"
 	"audistro-provider/internal/config"
 	"audistro-provider/internal/db"
+	"audistro-provider/internal/envcheck"
 	"audistro-provider/internal/fssecure"
 	"audistro-provider/internal/health"
 	"audistro-provider/internal/httpserver"
@@ -34,6 +35,8 @@ import (
 )
 
 func main() {
+	envcheck.MustValidate()
+
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		slog.Error("invalid configuration", slog.String("error", err.Error()))

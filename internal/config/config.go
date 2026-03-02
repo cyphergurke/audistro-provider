@@ -71,8 +71,11 @@ type Config struct {
 }
 
 func Load() Config {
-	env := strings.ToLower(strings.TrimSpace(getenv("PROVIDER_ENV", "prod")))
-	if env != "dev" && env != "prod" {
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("AUDISTRO_ENV")))
+	if env == "" {
+		env = strings.ToLower(strings.TrimSpace(getenv("PROVIDER_ENV", "prod")))
+	}
+	if env != "dev" && env != "prod" && env != "test" {
 		env = "prod"
 	}
 	dataPath := getenv("PROVIDER_DATA_PATH", "./data")
@@ -86,7 +89,7 @@ func Load() Config {
 	}
 
 	internalEnableDefault := false
-	if env == "dev" {
+	if env == "dev" || env == "test" {
 		internalEnableDefault = true
 	}
 	internalEnable, internalEnableExplicit := getenvBoolWithExplicit("PROVIDER_INTERNAL_ENABLE", internalEnableDefault)
