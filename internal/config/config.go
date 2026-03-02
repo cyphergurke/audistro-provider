@@ -20,6 +20,7 @@ const (
 )
 
 type Config struct {
+	Env                            string
 	HTTPAddr                       string
 	PublicBaseURL                  string
 	AllowInsecurePublicURL         bool
@@ -65,9 +66,15 @@ type Config struct {
 	AnnounceInterval               string
 	Region                         string
 	PrivateKeyPath                 string
+	InternalEnableExplicit         bool
+	InternalAllowedCIDRsExplicit   bool
 }
 
 func Load() Config {
+	env := strings.ToLower(strings.TrimSpace(getenv("PROVIDER_ENV", "prod")))
+	if env != "dev" && env != "prod" {
+		env = "prod"
+	}
 	dataPath := getenv("PROVIDER_DATA_PATH", "./data")
 	identityPath := os.Getenv("PROVIDER_IDENTITY_PATH")
 	if identityPath == "" {
@@ -78,7 +85,18 @@ func Load() Config {
 		dbPath = filepath.Join(dataPath, "provider.db")
 	}
 
+	internalEnableDefault := false
+	if env == "dev" {
+		internalEnableDefault = true
+	}
+	internalEnable, internalEnableExplicit := getenvBoolWithExplicit("PROVIDER_INTERNAL_ENABLE", internalEnableDefault)
+	internalAllowedCIDRs, internalAllowedCIDRsExplicit := getenvWithExplicit("PROVIDER_INTERNAL_ALLOWED_CIDRS")
+	if strings.TrimSpace(internalAllowedCIDRs) == "" && env == "dev" {
+		internalAllowedCIDRs = "127.0.0.1/32,::1/128"
+	}
+
 	return Config{
+		Env:                            env,
 		HTTPAddr:                       getenv("PROVIDER_HTTP_ADDR", ":8080"),
 		PublicBaseURL:                  os.Getenv("PROVIDER_PUBLIC_BASE_URL"),
 		AllowInsecurePublicURL:         getenvBool("PROVIDER_ALLOW_INSECURE_PUBLIC_URL", false),
@@ -87,8 +105,8 @@ func Load() Config {
 		DBPath:                         dbPath,
 		ScanOnStartup:                  getenvBool("PROVIDER_SCAN_ON_STARTUP", true),
 		EnableJobs:                     getenvBool("PROVIDER_ENABLE_JOBS", true),
-		InternalEnable:                 getenvBool("PROVIDER_INTERNAL_ENABLE", true),
-		InternalAllowedCIDRs:           getenv("PROVIDER_INTERNAL_ALLOWED_CIDRS", "127.0.0.1/32,::1/128"),
+		InternalEnable:                 internalEnable,
+		InternalAllowedCIDRs:           internalAllowedCIDRs,
 		TrustProxyHeaders:              getenvBool("PROVIDER_TRUST_PROXY_HEADERS", false),
 		TrustedProxyCIDRs:              strings.TrimSpace(os.Getenv("PROVIDER_TRUSTED_PROXY_CIDRS")),
 		ShutdownTimeoutSeconds:         getenvInt("PROVIDER_SHUTDOWN_TIMEOUT_SECONDS", 15),
@@ -124,6 +142,8 @@ func Load() Config {
 		AnnounceInterval:               os.Getenv("PROVIDER_ANNOUNCE_INTERVAL"),
 		Region:                         os.Getenv("PROVIDER_REGION"),
 		PrivateKeyPath:                 os.Getenv("PROVIDER_PRIVATE_KEY_PATH"),
+		InternalEnableExplicit:         internalEnableExplicit,
+		InternalAllowedCIDRsExplicit:   internalAllowedCIDRsExplicit,
 	}
 }
 
@@ -226,6 +246,9 @@ func (c Config) Validate() error {
 	}
 
 	if c.InternalEnable {
+		if strings.TrimSpace(c.InternalAllowedCIDRs) == "" {
+			return fmt.Errorf("PROVIDER_INTERNAL_ALLOWED_CIDRS is required when PROVIDER_INTERNAL_ENABLE=true")
+		}
 		if _, err := parseCIDRs(c.InternalAllowedCIDRs); err != nil {
 			return fmt.Errorf("invalid PROVIDER_INTERNAL_ALLOWED_CIDRS: %w", err)
 		}
@@ -292,6 +315,22 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getenvWithExplicit(key string) (string, bool) {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return "", false
+	}
+	return value, true
+}
+
+func getenvBoolWithExplicit(key string, fallback bool) (bool, bool) {
+	_, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback, false
+	}
+	return getenvBool(key, fallback), true
 }
 
 func getenvInt(key string, fallback int) int {

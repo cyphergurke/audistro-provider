@@ -86,6 +86,28 @@ func TestValidateHMACSecretTooShort(t *testing.T) {
 	}
 }
 
+func TestLoadDefaultsInternalAPIToDisabledInProd(t *testing.T) {
+	t.Setenv("PROVIDER_ENV", "prod")
+	t.Setenv("PROVIDER_INTERNAL_ENABLE", "")
+	t.Setenv("PROVIDER_INTERNAL_ALLOWED_CIDRS", "")
+
+	cfg := Load()
+	if cfg.InternalEnable {
+		t.Fatalf("expected internal api disabled by default in prod")
+	}
+}
+
+func TestValidateInternalAPIRequiresCIDRsWhenEnabled(t *testing.T) {
+	cfg := validConfigForTest(t)
+	cfg.InternalEnable = true
+	cfg.InternalAllowedCIDRs = ""
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "PROVIDER_INTERNAL_ALLOWED_CIDRS is required") {
+		t.Fatalf("expected missing internal cidr error, got %v", err)
+	}
+}
+
 func validConfigForTest(t *testing.T) Config {
 	t.Helper()
 	return Config{
