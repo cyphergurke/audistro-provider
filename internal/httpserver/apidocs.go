@@ -1,10 +1,14 @@
 package httpserver
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -16,7 +20,9 @@ const (
 )
 
 var (
-	//go:embed openapi.yaml
+	// Go embed cannot traverse to ../../api, so this package embeds a synced copy.
+	// The canonical manual spec lives at services/audistro-provider/api/openapi.v1.yaml.
+	//go:embed api/openapi.v1.yaml
 	openAPIYAML []byte
 
 	loadOpenAPISpecOnce sync.Once
@@ -25,7 +31,7 @@ var (
 	loadOpenAPISpecErr  error
 )
 
-func loadOpenAPISpec() (*openapi3.T, error) {
+func LoadSpec() (*openapi3.T, error) {
 	loadOpenAPISpecOnce.Do(func() {
 		loader := openapi3.NewLoader()
 		spec, err := loader.LoadFromData(openAPIYAML)
@@ -48,7 +54,7 @@ func loadOpenAPISpec() (*openapi3.T, error) {
 	return loadedOpenAPISpec, loadOpenAPISpecErr
 }
 
-func openAPISpecYAMLHandler() http.Handler {
+func OpenAPIYAMLHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
@@ -56,9 +62,9 @@ func openAPISpecYAMLHandler() http.Handler {
 	})
 }
 
-func openAPISpecJSONHandler() http.Handler {
+func OpenAPIJSONHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := loadOpenAPISpec()
+		_, err := LoadSpec()
 		if err != nil {
 			http.Error(w, fmt.Sprintf("load openapi spec: %v", err), http.StatusInternalServerError)
 			return
@@ -69,7 +75,7 @@ func openAPISpecJSONHandler() http.Handler {
 	})
 }
 
-func scalarDocsHandler(specPath string) http.Handler {
+func DocsHandler(specPath string) http.Handler {
 	if specPath == "" {
 		specPath = openAPIJSONPath
 	}
@@ -97,4 +103,39 @@ func scalarDocsHandler(specPath string) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(html))
 	})
+}
+
+func canonicalOpenAPIYAML() ([]byte, error) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil, fmt.Errorf("locate current file")
+	}
+	return os.ReadFile(filepath.Join(filepath.Dir(currentFile), "..", "..", "api", "openapi.v1.yaml"))
+}
+
+func embeddedOpenAPIYAMLMatchesCanonical() error {
+	canonical, err := canonicalOpenAPIYAML()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(canonical, openAPIYAML) {
+		return fmt.Errorf("embedded spec is out of sync with canonical spec")
+	}
+	compatPath := filepath.Join(filepath.Dir(mustCurrentFile()), "openapi.yaml")
+	compat, err := os.ReadFile(compatPath)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(canonical, compat) {
+		return fmt.Errorf("compatibility spec is out of sync with canonical spec")
+	}
+	return nil
+}
+
+func mustCurrentFile() string {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("locate current file")
+	}
+	return currentFile
 }

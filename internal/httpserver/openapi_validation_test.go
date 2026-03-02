@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestOpenAPIValidationRejectsWrongContentTypeForInternalAnnounce(t *testing.T) {
+func TestOpenAPIValidationRejectsInvalidInternalAnnounceBody(t *testing.T) {
 	cfg := config.Config{
 		HTTPAddr:                    ":0",
 		DataPath:                    t.TempDir(),
@@ -50,8 +50,8 @@ func TestOpenAPIValidationRejectsWrongContentTypeForInternalAnnounce(t *testing.
 		nil,
 	)
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/announce", bytes.NewReader([]byte(`{"asset_id":"asset1"}`)))
-	req.Header.Set("Content-Type", "text/plain")
+	req := httptest.NewRequest(http.MethodPost, "/internal/announce", bytes.NewReader([]byte(`{"unexpected":"value"}`)))
+	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	srv.HTTP.Handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {

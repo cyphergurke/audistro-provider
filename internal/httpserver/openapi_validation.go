@@ -17,7 +17,7 @@ type validationErrorResponse struct {
 }
 
 func OpenAPIValidation(next http.Handler) http.Handler {
-	spec, err := loadOpenAPISpec()
+	spec, err := LoadSpec()
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +63,9 @@ func OpenAPIValidation(next http.Handler) http.Handler {
 
 func shouldValidateOpenAPIRequest(path string) bool {
 	switch {
-	case path == "/healthz", path == "/readyz", path == "/metrics":
+	case path == "/healthz", path == "/readyz":
+		return true
+	case path == "/metrics":
 		return false
 	case path == openAPIYAMLPath, path == openAPIJSONPath, path == "/docs", path == "/docs/":
 		return false

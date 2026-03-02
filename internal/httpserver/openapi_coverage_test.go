@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 func TestOpenAPISpecCoversRegisteredEndpoints(t *testing.T) {
@@ -16,9 +18,9 @@ func TestOpenAPISpecCoversRegisteredEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read registered endpoints: %v", err)
 	}
-	specOps, err := parseOpenAPIOperations(string(openAPIYAML))
+	specOps, err := documentedOperations()
 	if err != nil {
-		t.Fatalf("parse openapi operations: %v", err)
+		t.Fatalf("load openapi operations: %v", err)
 	}
 
 	missing := make([]string, 0)
@@ -58,14 +60,10 @@ func registeredAPIEndpoints() ([]endpoint, error) {
 			continue
 		}
 		p := normalizePath(m[2])
+		if strings.HasPrefix(p, "/assets/") || p == "/docs" || p == "/docs/" || p == "/openapi.yaml" || p == "/openapi.json" || p == "/metrics" {
+			continue
+		}
 		found[endpoint{Method: m[1], Path: p}] = struct{}{}
-	}
-
-	if strings.Contains(src, `mux.Handle("/assets/", assetsHandler)`) {
-		found[endpoint{Method: "GET", Path: "/assets/{assetId}/master.m3u8"}] = struct{}{}
-		found[endpoint{Method: "HEAD", Path: "/assets/{assetId}/master.m3u8"}] = struct{}{}
-		found[endpoint{Method: "GET", Path: "/assets/{assetId}/{filename}"}] = struct{}{}
-		found[endpoint{Method: "HEAD", Path: "/assets/{assetId}/{filename}"}] = struct{}{}
 	}
 
 	out := make([]endpoint, 0, len(found))
@@ -88,44 +86,55 @@ func normalizePath(path string) string {
 	return strings.TrimSuffix(path, "/")
 }
 
-func parseOpenAPIOperations(spec string) (map[string]map[string]bool, error) {
-	lines := strings.Split(spec, "\n")
-	pathLine := regexp.MustCompile(`^\s{2}(/[^:]*):\s*$`)
-	methodLine := regexp.MustCompile(`^\s{4}(get|post|put|patch|delete|head|options|trace):\s*$`)
-
-	inPaths := false
-	currentPath := ""
-	out := make(map[string]map[string]bool)
-
-	for _, line := range lines {
-		switch {
-		case strings.TrimSpace(line) == "paths:":
-			inPaths = true
-			currentPath = ""
-			continue
-		case strings.TrimSpace(line) == "components:":
-			inPaths = false
-			currentPath = ""
+func documentedOperations() (map[string]map[string]bool, error) {
+	spec, err := loadCanonicalOpenAPISpec()
+	if err != nil {
+		return nil, err
+	}
+	ops := make(map[string]map[string]bool, len(spec.Paths.Map()))
+	for path, item := range spec.Paths.Map() {
+		normalized := normalizePath(path)
+		if strings.HasPrefix(normalized, "/assets/") || normalized == "/docs" || normalized == "/openapi.yaml" || normalized == "/openapi.json" || normalized == "/metrics" {
 			continue
 		}
-		if !inPaths {
-			continue
+		methods := make(map[string]bool)
+		if item.Get != nil {
+			methods["GET"] = true
 		}
-
-		if m := pathLine.FindStringSubmatch(line); len(m) == 2 {
-			currentPath = normalizePath(m[1])
-			if out[currentPath] == nil {
-				out[currentPath] = make(map[string]bool)
-			}
-			continue
+		if item.Post != nil {
+			methods["POST"] = true
 		}
-		if m := methodLine.FindStringSubmatch(line); len(m) == 2 && currentPath != "" {
-			out[currentPath][strings.ToUpper(m[1])] = true
+		if item.Put != nil {
+			methods["PUT"] = true
+		}
+		if item.Patch != nil {
+			methods["PATCH"] = true
+		}
+		if item.Delete != nil {
+			methods["DELETE"] = true
+		}
+		if item.Head != nil {
+			methods["HEAD"] = true
+		}
+		if len(methods) > 0 {
+			ops[normalized] = methods
 		}
 	}
+	return ops, nil
+}
 
-	if len(out) == 0 {
-		return nil, fmt.Errorf("no operations found")
+func loadCanonicalOpenAPISpec() (*openapi3.T, error) {
+	canonical, err := canonicalOpenAPIYAML()
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	loader := openapi3.NewLoader()
+	spec, err := loader.LoadFromData(canonical)
+	if err != nil {
+		return nil, err
+	}
+	if err := spec.Validate(loader.Context); err != nil {
+		return nil, err
+	}
+	return spec, nil
 }
